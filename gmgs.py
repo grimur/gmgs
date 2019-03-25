@@ -1,5 +1,11 @@
 import numpy
 from scipy.special import gamma
+from scipy.special import loggamma as loggamma_im
+import time
+
+
+def loggamma(val):
+    return loggamma_im(val).real
 
 
 class GaussianMixture(object):
@@ -21,7 +27,7 @@ class GaussianMixture(object):
         for i in range(self.N):
             self.membership[i, numpy.random.randint(self.K)] = 1
 
-        self.alpha = 0.1
+        self.alpha = 100
 
         self.k_0 = 0.1
         self.mu_0 = numpy.ones(self.m) / 10
@@ -50,6 +56,10 @@ class GaussianMixture(object):
         probs = [x / prob_sum for x in probs]
 
         dest_cluster = numpy.random.choice(range(self.K), p=probs)
+        self.update_membership(index, dest_cluster)
+
+    def update_membership(self, index, dest_cluster):
+        # update S
         self.membership[index, :] = 0
         self.membership[index, dest_cluster] = 1
 
@@ -72,7 +82,7 @@ class GaussianMixture(object):
 
         likelihood = \
             gamma((c + m) / 2) / (gamma(c / 2) * (c * numpy.pi) ** (float(m) / 2)) * \
-            numpy.sqrt(numpy.linalg.det(B)) * \
+            1.0 / numpy.sqrt(numpy.linalg.det(B)) * \
             (1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2)
 
         posterior = prior * likelihood
@@ -107,7 +117,7 @@ class GaussianMixture(object):
     def S(self, i, k):
         S = numpy.zeros((self.m, self.m))
         x_k = self.x_k(i, k)
-        for idx in numpy.where(self.membership[:, k]):
+        for idx in numpy.where(self.membership[:, k])[0]:
             if idx != i:
                 x = self.data[idx]
                 delta_x = x - x_k
