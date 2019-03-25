@@ -44,7 +44,24 @@ class GaussianMixture(object):
 
     def gibbs_round(self):
         for i in xrange(self.N):
-            self.gibbs_step(i)
+            self.gibbs_step_log(i)
+
+    def gibbs_step_log(self, index):
+        log_probs = []
+        for k in xrange(self.K):
+            log_p = self.calculate_log_posterior(index, k)
+            log_probs.append(log_p)
+
+        max_log = numpy.max(log_probs)
+        probs = [numpy.exp(x - max_log) for x in log_probs]
+        probs_sum = numpy.sum(probs)
+        norm_probs = [x / probs_sum for x in probs]
+
+        dest_cluster = numpy.random.choice(range(self.K), p=norm_probs)
+        source_cluster = numpy.argmax(self.membership[index, :])
+        if source_cluster != dest_cluster:
+            self.membership[index, source_cluster] = 0
+            self.membership[index, dest_cluster] = 1
 
     def gibbs_step(self, index):
         probs = []
@@ -88,6 +105,29 @@ class GaussianMixture(object):
         posterior = prior * likelihood
 
         return posterior
+
+    def calculate_log_posterior(self, i, k):
+        x = self.data[i]
+        c_k = numpy.sum(self.membership[:, k])
+        if self.membership[i, k] == 1:
+            c_k -= 1
+
+        log_prior_denominator = numpy.log(self.alpha + self.N - 1)
+        log_prior = numpy.log((self.alpha / self.K) + c_k) - log_prior_denominator
+
+        c = self.c(i, k)  # cluster specific parameter
+        a = self.mu(i, k)  # cluster specific parameter
+        B = self.B(i, k)  # cluster specific parameter
+        m = self.m  # dimensionality?
+
+        log_likelihood = \
+            loggamma((c + m) / 2) - loggamma(c / 2) - m * numpy.log(c * numpy.pi) / 2 - \
+            numpy.log(numpy.sqrt(numpy.linalg.det(B))) + \
+            numpy.log((1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2))
+
+        log_posterior = log_prior + log_likelihood
+
+        return log_posterior
 
     def c(self, i, k):
         return self.v_k(i, k) - self.m + 1
