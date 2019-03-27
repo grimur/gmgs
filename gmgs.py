@@ -29,10 +29,16 @@ class GaussianMixture(object):
 
         self.alpha = 1000
 
-        self.k_0 = 10.0
-        self.mu_0 = numpy.ones(self.m) / 10
-        self.lambda_0 = numpy.ones((self.m, self.m)) / 10
-        self.v_0 = 0.1
+        # self.k_0 = 10.0
+        # self.mu_0 = numpy.ones(self.m) / 10
+        # self.lambda_0 = numpy.ones((self.m, self.m)) / 10
+        # kinda needs to be an int?
+        # self.v_0 = 1.0
+        self.k_0 = 0.05
+        self.mu_0 = numpy.ones(self.m)
+        self.lambda_0 = numpy.eye(self.m)
+        # kinda needs to be an int?
+        self.v_0 = 1000.0
 
     def fit(self, iterations=300, burn_in=30):
         for i in xrange(burn_in):
@@ -180,12 +186,14 @@ class GaussianMixture(object):
 
     def c_k(self, i, k):
         c_k_vec = self.membership[:, k].copy()
-        c_k_vec[i] = 0
+        if i is not None:
+            c_k_vec[i] = 0
         return numpy.sum(c_k_vec)
 
     def x_k(self, i, k):
         c_k_vec = self.membership[:, k].copy()
-        c_k_vec[i] = 0
+        if i is not None:
+            c_k_vec[i] = 0
         x_k = numpy.mean(self.data[c_k_vec == 1], axis=0)
         return x_k
 
@@ -212,3 +220,37 @@ class GaussianMixture(object):
 
         B = lambda_k * (1 + k_k) / (k_k * (v_k - m + 1))
         return B
+
+    def simulate_parameter(self, k):
+        v_n = int(self.v_k(None, k))
+        lambda_n = self.lambda_(None, k)
+        lambda_n_inv = numpy.linalg.inv(lambda_n)
+
+        sigma = numpy.zeros((self.m, self.m))
+        zero_mean_vector = numpy.zeros(self.m)
+        for i in xrange(v_n):
+            alpha = numpy.random.multivariate_normal(zero_mean_vector, lambda_n_inv)
+            sigma += numpy.outer(alpha, alpha)
+
+        k_n = self.k_k(None, k)
+        mu_n = self.mu(None, k)
+        mu = numpy.random.multivariate_normal(mu_n, sigma / k_n)
+
+        return mu, sigma
+
+    def simulate_parameter_initial(self):
+        v_0 = int(self.v_0)
+        lambda_0 = self.lambda_0
+        lambda_0_inv = numpy.linalg.pinv(lambda_0)
+
+        sigma = numpy.zeros((self.m, self.m))
+        zero_mean_vector = numpy.zeros(self.m)
+        for i in xrange(v_0):
+            alpha = numpy.random.multivariate_normal(zero_mean_vector, lambda_0_inv)
+            sigma += numpy.outer(alpha, alpha)
+
+        k_0 = self.k_0
+        mu_0 = self.mu_0
+        mu = numpy.random.multivariate_normal(mu_0, sigma / k_0)
+
+        return mu, sigma
