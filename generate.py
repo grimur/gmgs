@@ -2,10 +2,16 @@ import numpy
 
 
 class TestData(object):
-    def __init__(self, classes=2, num=100, dims=2):
+    def __init__(self, classes=2, num=100, dims=2, means=None, stds=None):
         self.classes = {}
-        self.means = [numpy.random.random(dims) for x in range(classes)]
-        self.stds = [numpy.random.random(dims)*0.1 for x in range(classes)]
+        if means is not None:
+            self.means = means
+        else:
+            self.means = [numpy.random.random(dims) for x in range(classes)]
+        if stds is not None:
+            self.stds = stds
+        else:
+            self.stds = [numpy.random.random(dims)*0.1 for x in range(classes)]
 
         for i in range(num):
             label = numpy.random.randint(classes)
