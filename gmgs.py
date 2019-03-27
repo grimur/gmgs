@@ -27,11 +27,11 @@ class GaussianMixture(object):
         for i in range(self.N):
             self.membership[i, numpy.random.randint(self.K)] = 1
 
-        self.alpha = 100
+        self.alpha = 1000
 
-        self.k_0 = 0.1
+        self.k_0 = 10.0
         self.mu_0 = numpy.ones(self.m) / 10
-        self.lambda_0 = numpy.eye(self.m) / 10
+        self.lambda_0 = numpy.ones((self.m, self.m)) / 10
         self.v_0 = 0.1
 
     def fit(self, iterations=300, burn_in=30):
@@ -80,17 +80,21 @@ class GaussianMixture(object):
         self.membership[index, :] = 0
         self.membership[index, dest_cluster] = 1
 
-    def calculate_posterior(self, i, k):
-        """
-        # Calculate the posterior probability that data point at index i
-        # belongs to cluster k
-        """
-        x = self.data[i]
+    def prior(self, i, k):
         c_k = numpy.sum(self.membership[:, k])
         if self.membership[i, k] == 1:
             c_k -= 1
 
-        prior = ((self.alpha / self.K) + c_k) / (self.alpha + self.N - 1)
+        alpha = float(self.alpha)
+        K = float(self.K)
+        c_k = float(c_k)
+        N = float(self.N)
+
+        prior = ((alpha / K) + c_k) / (alpha + N - 1)
+        return prior
+
+    def likelihood(self, i, k):
+        x = self.data[i]
 
         c = self.c(i, k)  # cluster specific parameter
         a = self.mu(i, k)  # cluster specific parameter
@@ -102,6 +106,15 @@ class GaussianMixture(object):
             1.0 / numpy.sqrt(numpy.linalg.det(B)) * \
             (1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2)
 
+        return likelihood
+
+    def calculate_posterior(self, i, k):
+        """
+        # Calculate the posterior probability that data point at index i
+        # belongs to cluster k
+        """
+        prior = self.prior(i, k)
+        likelihood = self.likelihood(i, k)
         posterior = prior * likelihood
 
         return posterior
@@ -185,7 +198,9 @@ class GaussianMixture(object):
         k_k = self.k_k(i, k)
         mu_0 = self.mu_0
 
-        lambda_k = lambda_0 + S + k_0 * c_k / k_k * numpy.outer(x_k - mu_0, x_k - mu_0)
+        outer = numpy.outer(x_k - mu_0, x_k - mu_0)
+        outer_product_term = k_0 * c_k / k_k * outer
+        lambda_k = lambda_0 + S + outer_product_term
 
         return lambda_k
 
@@ -194,5 +209,6 @@ class GaussianMixture(object):
         k_k = self.k_k(i, k)
         v_k = self.v_k(i, k)
         m = self.m
+
         B = lambda_k * (1 + k_k) / (k_k * (v_k - m + 1))
         return B
