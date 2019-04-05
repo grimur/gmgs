@@ -23,6 +23,10 @@ class GaussianMixture(object):
         self.membership = numpy.zeros((self.N, self.K), dtype='uint')
         self.posteriors = numpy.zeros((self.N, self.K), dtype='uint')
 
+        self.membership_probabilities = numpy.zeros((self.N, self.K))
+        self.membership_probabilities_list = []
+        self.membership_probability_deltas = []
+
         # Init to random clusters.
         for i in range(self.N):
             self.membership[i, numpy.random.randint(self.K)] = 1
@@ -41,6 +45,8 @@ class GaussianMixture(object):
         self.v_0 = 10.0
 
     def fit(self, iterations=300, burn_in=30):
+        # For the Crusemann NRPS data, we seem to reach stability
+        # ~ 30 iterations in
         print 'Burn-in'
         for i in xrange(burn_in):
             print "%s / %s" % (i, burn_in)
@@ -52,9 +58,37 @@ class GaussianMixture(object):
             self.gibbs_round()
             self.posteriors += self.membership
 
+            if self.check_convergence():
+                print 'Converged in %s steps' % i
+                break
+
+    def check_convergence(self, window_size=20, steps=5, epsilon=0.001):
+        mean_deltas = []
+
+        # Monitor for steps in a row where the mean of membership probability
+        # deltas is less than epsilon
+        for i in xrange(1, steps + 1):
+            mean_deltas.append(numpy.mean(self.membership_probability_deltas[-i - window_size:-i]) < epsilon)
+
+        if mean_deltas[0] and len(set(mean_deltas)) == 1:
+            return True
+        else:
+            return False
+
     def gibbs_round(self):
+        # Update memberships for each data point
         for i in xrange(self.N):
             self.gibbs_step_log(i)
+
+        # Keep track of membership probabilities for convergence
+        self.membership_probabilities_list.append(self.membership_probabilities)
+        if len(self.membership_probabilities_list) > 1:
+            self.membership_probability_deltas.append(
+                    numpy.mean(
+                        numpy.max(self.membership_probabilities_list[-1], axis=1) - numpy.max(self.membership_probabilities_list[-2], axis=1)
+                    )
+            )
+        self.membership_probabilities = numpy.zeros((self.N, self.K))
 
     def gibbs_step_log(self, index):
         log_probs = []
@@ -67,6 +101,10 @@ class GaussianMixture(object):
         probs_sum = numpy.sum(probs)
         norm_probs = [x / probs_sum for x in probs]
 
+        # Store membership probabilities
+        self.membership_probabilities[index, :] = norm_probs
+
+        # Reassignment
         dest_cluster = numpy.random.choice(range(self.K), p=norm_probs)
         source_cluster = numpy.argmax(self.membership[index, :])
         if source_cluster != dest_cluster:
