@@ -38,13 +38,17 @@ class GaussianMixture(object):
         self.mu_0 = numpy.ones(self.m)
         self.lambda_0 = numpy.eye(self.m)
         # kinda needs to be an int?
-        self.v_0 = 1000.0
+        self.v_0 = 10.0
 
     def fit(self, iterations=300, burn_in=30):
+        print 'Burn-in'
         for i in xrange(burn_in):
+            print "%s / %s" % (i, burn_in)
             self.gibbs_round()
 
+        print 'Fit'
         for i in xrange(iterations):
+            print "%s / %s" % (i, iterations)
             self.gibbs_round()
             self.posteriors += self.membership
 
@@ -144,6 +148,9 @@ class GaussianMixture(object):
             numpy.log(numpy.sqrt(numpy.linalg.det(B))) + \
             numpy.log((1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2))
 
+        print 'prior:', log_prior
+        print 'likelihood:', log_likelihood
+
         log_posterior = log_prior + log_likelihood
 
         return log_posterior
@@ -238,7 +245,7 @@ class GaussianMixture(object):
 
         return mu, sigma
 
-    def simulate_parameter_initial(self):
+    def simulate_parameter_prior(self):
         v_0 = int(self.v_0)
         lambda_0 = self.lambda_0
         lambda_0_inv = numpy.linalg.pinv(lambda_0)
@@ -254,3 +261,44 @@ class GaussianMixture(object):
         mu = numpy.random.multivariate_normal(mu_0, sigma / k_0)
 
         return mu, sigma
+
+    def simulate_data_from_prior(self, num=1000):
+        parameters = []
+        for k in xrange(self.K):
+            mu_k, sigma_k = self.simulate_parameter_prior()
+            parameters.append((mu_k, sigma_k))
+
+        points = []
+        labels = []
+
+        for i in xrange(num):
+            k = numpy.random.choice(range(self.K))
+            mu_k, sigma_k = parameters[k]
+            p = numpy.random.multivariate_normal(mu_k, sigma_k)
+            points.append(p)
+            labels.append(k)
+
+        return points, labels
+
+    def simulate_data_from_posterior(self, num=1000):
+        parameters = []
+        label_probs = []
+        for k in xrange(self.K):
+            mu_k, sigma_k = self.simulate_parameter(k)
+            parameters.append((mu_k, sigma_k))
+            c_k = self.c_k(None, k)
+            label_probs.append(c_k)
+
+        label_probs = [float(x) / sum(label_probs) for x in label_probs]
+
+        points = []
+        labels = []
+
+        for i in xrange(num):
+            k = numpy.random.choice(range(self.K), p=label_probs)
+            mu_k, sigma_k = parameters[k]
+            p = numpy.random.multivariate_normal(mu_k, sigma_k)
+            points.append(p)
+            labels.append(k)
+
+        return points, labels
