@@ -86,7 +86,6 @@ class GaussianMixture(object):
         self.update_membership(index, dest_cluster)
 
     def update_membership(self, index, dest_cluster):
-        # update S
         self.membership[index, :] = 0
         self.membership[index, dest_cluster] = 1
 
@@ -148,9 +147,6 @@ class GaussianMixture(object):
             numpy.log(numpy.sqrt(numpy.linalg.det(B))) + \
             numpy.log((1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2))
 
-        print 'prior:', log_prior
-        print 'likelihood:', log_likelihood
-
         log_posterior = log_prior + log_likelihood
 
         return log_posterior
@@ -201,7 +197,12 @@ class GaussianMixture(object):
         c_k_vec = self.membership[:, k].copy()
         if i is not None:
             c_k_vec[i] = 0
-        x_k = numpy.mean(self.data[c_k_vec == 1], axis=0)
+        # If we're removing the only point, randomly generate a new mean from the prior
+        if numpy.sum(c_k_vec) == 0:
+            simulated_parameters = self.simulate_parameter_prior()
+            x_k = simulated_parameters[0]
+        else:
+            x_k = numpy.mean(self.data[c_k_vec == 1], axis=0)
         return x_k
 
     def lambda_(self, i, k):
