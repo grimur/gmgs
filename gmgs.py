@@ -44,8 +44,6 @@ class GaussianMixture(object):
         # kinda needs to be an int?
         self.v_0 = 10.0
 
-        self.S_cache = numpy.zeros((self.K, self.m, self.m))
-
     def fit(self, iterations=300, burn_in=30):
         self.init_cache()
 
@@ -177,9 +175,14 @@ class GaussianMixture(object):
         log_prior_denominator = numpy.log(self.alpha + self.N - 1)
         log_prior = numpy.log((self.alpha / self.K) + c_k) - log_prior_denominator
 
-        c = self.c(i, k)  # cluster specific parameter
-        a = self.mu(i, k)  # cluster specific parameter
-        B = self.B(i, k)  # cluster specific parameter
+        if self.membership[i, k] == 1:
+            c = self.c(i, k)  # cluster specific parameter
+            a = self.mu(i, k)  # cluster specific parameter
+            B = self.B(i, k)  # cluster specific parameter
+        else:
+            c = self.c_cache[k]
+            a = self.a_cache[k]
+            B = self.B_cache[k]
         m = self.m  # dimensionality?
 
         log_likelihood = \
@@ -217,7 +220,10 @@ class GaussianMixture(object):
         return (k_0 * mu_0 + c_k * x_k) / (k_0 + c_k)
 
     def init_cache(self):
-        self.init_S()
+        self.S_cache = [self.calculate_S(None, k) for k in xrange(self.K)]
+        self.c_cache = [self.c(None, x) for x in xrange(self.K)]
+        self.a_cache = [self.mu(None, x) for x in xrange(self.K)]
+        self.B_cache = [self.B(None, x) for x in xrange(self.K)]
 
     def update_cache(self, i, k_old, k_new):
         if k_old == k_new:
@@ -226,11 +232,15 @@ class GaussianMixture(object):
             self.S_cache[k_old] = self.calculate_S(None, k_old)
             self.S_cache[k_new] = self.calculate_S(None, k_new)
 
-    def init_S(self):
-        self.S_cache = [self.calculate_S(None, k) for k in xrange(self.K)]
+            self.c_cache[k_new] = self.c(None, k_new)  # cluster specific parameter
+            self.a_cache[k_new] = self.mu(None, k_new)  # cluster specific parameter
+            self.B_cache[k_new] = self.B(None, k_new)  # cluster specific parameter
+            self.c_cache[k_old] = self.c(None, k_old)  # cluster specific parameter
+            self.a_cache[k_old] = self.mu(None, k_old)  # cluster specific parameter
+            self.B_cache[k_old] = self.B(None, k_old)  # cluster specific parameter
 
     def S(self, i, k):
-        if self.membership[i, k] == 1:
+        if i is None or self.membership[i, k] == 1:
             S = self.calculate_S(i, k)
         else:
             S = self.S_cache[k]
