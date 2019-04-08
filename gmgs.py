@@ -44,7 +44,11 @@ class GaussianMixture(object):
         # kinda needs to be an int?
         self.v_0 = 10.0
 
+        self.S_cache = numpy.zeros((self.K, self.m, self.m))
+
     def fit(self, iterations=300, burn_in=30):
+        self.init_cache()
+
         # For the Crusemann NRPS data, we seem to reach stability
         # ~ 30 iterations in
         print 'Burn-in'
@@ -111,12 +115,10 @@ class GaussianMixture(object):
             self.membership[index, source_cluster] = 0
             self.membership[index, dest_cluster] = 1
 
-    def gibbs_step(self, index):
-        probs = []
-        for k in xrange(self.K):
-            prob = self.calculate_posterior(index, k)
-            probs.append(prob)
+        self.update_cache(index, source_cluster, dest_cluster)
 
+    def gibbs_step(self, index):
+        probs = [self.calculate_posterior(index, k) for x in xrange(self.K)]
         prob_sum = numpy.sum(probs)
         probs = [x / prob_sum for x in probs]
 
@@ -214,7 +216,27 @@ class GaussianMixture(object):
 
         return (k_0 * mu_0 + c_k * x_k) / (k_0 + c_k)
 
+    def init_cache(self):
+        self.init_S()
+
+    def update_cache(self, i, k_old, k_new):
+        if k_old == k_new:
+            return
+        else:
+            self.S_cache[k_old] = self.calculate_S(None, k_old)
+            self.S_cache[k_new] = self.calculate_S(None, k_new)
+
+    def init_S(self):
+        self.S_cache = [self.calculate_S(None, k) for k in xrange(self.K)]
+
     def S(self, i, k):
+        if self.membership[i, k] == 1:
+            S = self.calculate_S(i, k)
+        else:
+            S = self.S_cache[k]
+        return S
+
+    def calculate_S(self, i, k):
         S = numpy.zeros((self.m, self.m))
         x_k = self.x_k(i, k)
         for idx in numpy.where(self.membership[:, k])[0]:
