@@ -44,6 +44,15 @@ class GaussianMixture(object):
         # kinda needs to be an int?
         self.v_0 = 10.0
 
+    def set_membership(self, labels):
+        self.membership.fill(0)
+        used_labels = []
+        for i, l in enumerate(labels):
+            if l not in used_labels:
+                used_labels.append(l)
+            l_idx = used_labels.index(l)
+            self.membership[i, l_idx] = 1
+
     def fit(self, iterations=300, burn_in=30):
         self.init_cache()
 
