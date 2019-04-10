@@ -176,7 +176,14 @@ class GaussianMixture(object):
         return posterior
 
     def calculate_log_posterior(self, i, k):
-        x = self.data[i]
+        log_prior = self.calculate_log_prior(i, k)
+        log_likelihood = self.calculate_log_likelihood(i, k)
+
+        log_posterior = log_prior + log_likelihood
+
+        return log_posterior
+
+    def calculate_log_prior(self, i, k):
         c_k = numpy.sum(self.membership[:, k])
         if self.membership[i, k] == 1:
             c_k -= 1
@@ -184,6 +191,10 @@ class GaussianMixture(object):
         log_prior_denominator = numpy.log(self.alpha + self.N - 1)
         log_prior = numpy.log((self.alpha / self.K) + c_k) - log_prior_denominator
 
+        return log_prior
+
+    def calculate_log_likelihood(self, i, k):
+        x = self.data[i]
         if self.membership[i, k] == 1:
             c = self.c(i, k)  # cluster specific parameter
             a = self.mu(i, k)  # cluster specific parameter
@@ -199,9 +210,7 @@ class GaussianMixture(object):
             numpy.log(numpy.sqrt(numpy.linalg.det(B))) + \
             numpy.log((1 + numpy.dot(numpy.dot(x - a, numpy.linalg.inv(B)), x - a) / c) ** (float(- c - m) / 2))
 
-        log_posterior = log_prior + log_likelihood
-
-        return log_posterior
+        return log_likelihood
 
     def c(self, i, k):
         return self.v_k(i, k) - self.m + 1
@@ -268,13 +277,14 @@ class GaussianMixture(object):
 
     def c_k(self, i, k):
         c_k_vec = self.membership[:, k].copy()
-        if i is not None:
+        if i is not None and numpy.sum(c_k_vec) > 1:
             c_k_vec[i] = 0
         return numpy.sum(c_k_vec)
 
     def x_k(self, i, k):
         c_k_vec = self.membership[:, k].copy()
-        if i is not None:
+        # if i is not None:
+        if i is not None and numpy.sum(c_k_vec) > 1:
             c_k_vec[i] = 0
         # If we're removing the only point, randomly generate a new mean from the prior
         if numpy.sum(c_k_vec) == 0:
