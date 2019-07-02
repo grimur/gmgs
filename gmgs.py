@@ -1,4 +1,5 @@
 import numpy
+import scipy
 from scipy.special import gamma
 from scipy.special import loggamma as loggamma_im
 import time
@@ -361,8 +362,11 @@ class GaussianMixture(object):
         points = []
         labels = []
 
+        gamma_vector = [scipy.random.gamma(1.0, self.alpha) for x in range(self.K)]
+        dirichlet_vector = [x / sum(gamma_vector) for x in gamma_vector]
+
         for i in xrange(num):
-            k = numpy.random.choice(range(self.K))
+            k = numpy.random.choice(range(self.K), p=dirichlet_vector)
             mu_k, sigma_k = parameters[k]
             p = numpy.random.multivariate_normal(mu_k, sigma_k)
             points.append(p)
